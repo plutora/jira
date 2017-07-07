@@ -3,9 +3,6 @@
 # To use, you'll need to provide valid Jira crendials and a credentials.cfg file for the Plutor login
 # Also, make sure to reference a valid Release and Release Phase on lines 21 and 23
 
-# Jira Credentials
-j_user = 'provideAValidUserName'
-j_password = 'provideAValidPassword'
 
 # pip install jira
 from jira import JIRA
@@ -14,6 +11,13 @@ import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'restApiLibrary'))
 # github.com/plutora/restApiLibrary
 import plutora
+import json
+
+# Jira Credentials - load from jira.cfg
+with open("jira.cfg") as data_file:
+	jiraCfg = json.load(data_file)
+j_user = jiraCfg["username"]
+j_password = jiraCfg["password"]
 
 # Login to Plutora Jira instance
 jira = JIRA(server='https://plutora.atlassian.net',basic_auth=(j_user,j_password))
