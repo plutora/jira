@@ -50,10 +50,8 @@ jiraReleases = requests.get('https://plutora.atlassian.net/rest/api/2/project/AP
 jiraRelease = jiraReleases.json()[0]
 jiraReleaseName = jiraRelease['name']
 
-jiraIssues = requests.get('https://plutora.atlassian.net/rest/api/2/search?jql=fixVersion = ' + jiraReleaseName, auth=('yash.zolmajdi@plutora.com', 'Funtime1995'))
-jiraIssue = jiraIssues.json()['issues'][0]
-jiraKey = jiraIssue['key']
-jiraName = jiraIssue['fields']['summary']
+jiraIssuesReponse = requests.get('https://plutora.atlassian.net/rest/api/2/search?jql=fixVersion = ' + jiraReleaseName, auth=('yash.zolmajdi@plutora.com', 'Funtime1995'))
+jiraIssues = jiraIssuesReponse.json()['issues']
 
 plutoraRelease = {
 	"identifier": jiraReleaseName,
@@ -88,47 +86,16 @@ systemToAttach = {
 }
 plutora.api('POST',"releases/%s/systems" % createdReleaseId,data=systemToAttach)
 
-changeId = plutora.guidByPathAndName('changes',jiraName)
 # PUT changes/{id}/deliveryReleases/{releaseId}
 releaseData = {
   "releaseId": createdReleaseId,
   "targetRelease": "true",
   "actualDeliveryRelease": "true"
 }
-plutora.api('put',"changes/%s/deliveryReleases/%s" % (changeId, createdReleaseId), releaseData )
 
-exit()
+# Attach all Changes to release
+for jiraIssue in jiraIssues:
+	jiraName = jiraIssue['fields']['summary']
+	changeId = plutora.guidByPathAndName('changes',jiraName)
+	plutora.api('put',"changes/%s/deliveryReleases/%s" % (changeId, createdReleaseId), releaseData )
 
-
-# Select Release to apply the tasks/Activities to
-releaseId = plutora.guidByPathAndName('releases',releaseName)
-# Select target Release Phase for the Activities
-DEV_phaseId = plutora.guidByPathAndName('workitemnames/phases',releasePhase)
-
-# Retrieve Jira tasks
-tasks = jira.search_issues(jql_str, startAt=0, maxResults=10, validate_query=True,
-              fields=None, expand=None, json_result=None)
-print "Found %d Jira tasks." % len(tasks)
-# For each Jira task found
-for task in tasks:
-	print "Processing Jira task %s" % jira.issue(task.key)
-	taskHandle = jira.issue(task.id)
-	Title = taskHandle.raw['fields']['summary']
-	Description = "Jira task %s" % jira.issue(task.key)
-	EndDate = taskHandle.raw['fields']['duedate']
-	# Only create Activities with due dates
-	if (EndDate==None):
-		break
-	#print "%sT00:00:00" % EndDate
-
-	activity = {
-		'Title': Title,
-		'Description': Description,
-		'ActivityDependencyType': 'None',
-		'Type': 'Activity',
-		'Status': 'NotStarted',
-		'AssignedToID': plutora.guidByPathAndName('users',releaseStakeholder,field="userName"),
-		'AssignedWorkItemID': plutora.guidByPathAndName("releases/%s/phases" % releaseId, DEV_phaseId, field="workItemNameID"), # Phase
-		'EndDate': "%sT00:00:00" % EndDate
-	}
-	plutora.api('POST',"releases/%s/activities" % releaseId ,data=activity)
