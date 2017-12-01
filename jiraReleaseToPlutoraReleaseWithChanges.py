@@ -1,5 +1,15 @@
 # python 2.7
-# Create Plutora Releases from Jira Releases including Changes/Issues
+# Creates Plutora Releases from Jira Releases (Versions, fixVersion)
+# Attaches the Plutora Changes corresponding to the Jira Issues associated with the Jira Release (i.e., Jira issues with the fixVersion of the Release) 
+#
+# Currently, only running on company.plutora.com several GUIDs are hardcoded:
+	# "systemId": "0d606b59-f6d5-e711-80c1-bc764e049ceb","system": "Lux",
+	# "systemRoleType": "Impact","systemRoleDependencyTypeId": "15767d33-5146-410b-8755-0b451335c79b",
+	# "releaseTypeId": "90d030c3-04a4-4c59-9e4a-90928293b8d0","releaseType": "Major",
+	# "releaseStatusTypeId": "b723ec3f-2200-4c0b-aa98-eb381d049bfb","releaseStatusType": "Draft",
+	# "releaseRiskLevelId": "bbc6670d-1414-48d9-ad35-fb1d1d5c21cf","releaseRiskLevel": "Low",
+	# "organizationId": "a16c6d64-69d5-e711-80c1-bc764e049ceb","organization": "Hospitality",
+
 # To use, you'll need to provide a valid Jira crendials file (jira.cfg): 
 #	{
 #		"username":"JiraLoginName",
@@ -20,13 +30,14 @@
 #	}
 # Where usoath and usapi should be replaced by ukoath and ukapi is you're
 # using a UK-based Plutora instance, and auoath and uaapi if in Asia.
-# Set a valid Release name and one of its Phase names below:
+#
+# Set a valid Release Jira Project Name:
 jiraProjectName = 'AP'
 
 #---------------END of instructions--------------------------------------
 
 # pip2 install jira
-from jira import JIRA
+#from jira import JIRA
 import re
 import sys, os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'restApiLibrary'))
@@ -99,11 +110,14 @@ for jiraRelease in jiraReleases:
 	if jiraReleaseName in existingReleases:
 		createdReleaseId = existingReleases[jiraReleaseName]
 		plutoraRelease["id"] = createdReleaseId
+		print "Updating Plutora Release \"%s\"" % jiraReleaseName
 		plutora.api('PUT',"releases/" + createdReleaseId,data=plutoraRelease)
 	else:
+		print "Creating Plutora Release \"%s\"" % jiraReleaseName
 		createdRelease = plutora.api('POST',"releases",data=plutoraRelease)
 		createdReleaseId = createdRelease['id']
 		# TODO: test for whether the system is attached and move outside of this clause
+		print "\tAttaching System \"%s\"" % "Lux"
 		plutora.api("POST","releases/%s/systems" % createdReleaseId,data=systemToAttach)
 
 	# PUT changes/{id}/deliveryReleases/{releaseId}
@@ -120,8 +134,7 @@ for jiraRelease in jiraReleases:
 		jiraName = jiraIssue['fields']['summary']
 		if jiraName in existingChanges:
 			changeId = plutora.guidByPathAndName('changes',jiraName)
+			print "\tAttaching Plutora Change \"%s\"" % jiraName
 			plutora.api('put',"changes/%s/deliveryReleases/%s" % (changeId, createdReleaseId), releaseData )
 		else:
-			print jiraName + " does not exist in Plutora Changes, not attaching to release " + jiraReleaseName
-			
-
+			print "\t" + "\"" + jiraName + "\"" + " does not exist in Plutora Changes, skipping for Plutora Release " + jiraReleaseName
