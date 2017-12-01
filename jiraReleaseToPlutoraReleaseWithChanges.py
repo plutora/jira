@@ -36,21 +36,22 @@ import json
 import requests
 
 # Jira Credentials - load from jira.cfg
-# with open("jira.cfg") as data_file:
-	# jiraCfg = json.load(data_file)
-# j_url = jiraCfg["url"]
-# j_user = jiraCfg["username"]
-# j_password = jiraCfg["password"]
+with open("jira.cfg") as data_file:
+	jiraCfg = json.load(data_file)
+j_url = jiraCfg["url"]
+j_user = jiraCfg["username"]
+j_password = jiraCfg["password"]
 
 # Login to Plutora Jira instance
 # jira = JIRA(server=j_url,basic_auth=(j_user,j_password))
 
 # Get Jira releases
-jiraReleases = requests.get('https://plutora.atlassian.net/rest/api/2/project/AP/versions', auth=('yash.zolmajdi@plutora.com', 'Funtime1995'))
+# GET /rest/api/2/project/{projectIdOrKey}/versions
+jiraReleases = requests.get(j_url + "/rest/api/2/project/AP/versions", auth=(j_user, j_password))
 jiraRelease = jiraReleases.json()[0]
 jiraReleaseName = jiraRelease['name']
 
-jiraIssuesReponse = requests.get('https://plutora.atlassian.net/rest/api/2/search?jql=fixVersion = ' + jiraReleaseName, auth=('yash.zolmajdi@plutora.com', 'Funtime1995'))
+jiraIssuesReponse = requests.get(j_url + "/rest/api/2/search?jql=fixVersion = " + jiraReleaseName, auth=(j_user, j_password))
 jiraIssues = jiraIssuesReponse.json()['issues']
 
 plutoraRelease = {
