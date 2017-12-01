@@ -47,19 +47,24 @@ j_password = jiraCfg["password"]
 
 # Get Jira releases
 # GET /rest/api/2/project/{projectIdOrKey}/versions
-jiraReleasesResponse = requests.get(j_url + "/rest/api/2/project/AP/versions", auth=(j_user, j_password))
+jiraReleasesResponse = requests.get(j_url + "/rest/api/2/project/"+ jiraProjectName +"/versions", auth=(j_user, j_password))
 jiraReleases = jiraReleasesResponse.json()
+
+# Get existing Plutora Releases
+existingReleases = plutora.listToDict(plutora.api("GET","releases"), "identifier", "id")
 
 # For each Jira Release
 for jiraRelease in jiraReleases:
 	jiraReleaseName = jiraRelease['name']
 	jiraIssuesReponse = requests.get(j_url + "/rest/api/2/search?jql=fixVersion = " + jiraReleaseName, auth=(j_user, j_password))
 	jiraIssues = jiraIssuesReponse.json()['issues']
-
+	
+	jiraIssueUrl = j_url + "/projects/" + jiraProjectName + "/versions/" + jiraRelease['id']
+	
 	plutoraRelease = {
 		"identifier": jiraReleaseName,
 		"name": "Jira Version " + jiraReleaseName,
-		"summary": "",
+		"summary": "<a href=\"%s\">%s</a>" % (jiraIssueUrl,jiraIssueUrl),
 		"releaseTypeId": "90d030c3-04a4-4c59-9e4a-90928293b8d0",
 		"releaseType": "Major",
 		"location": "",
@@ -67,7 +72,7 @@ for jiraRelease in jiraReleases:
 		"releaseStatusType": "Draft",
 		"releaseRiskLevelId": "bbc6670d-1414-48d9-ad35-fb1d1d5c21cf",
 		"releaseRiskLevel": "Low",
-		"implementationDate": "2017-12-31T00:00:00",
+		"implementationDate": "2018-12-31T00:00:00",
 		"displayColor": "#ccffff",
 		"organizationId": "a16c6d64-69d5-e711-80c1-bc764e049ceb",
 		"organization": "Hospitality",
@@ -75,8 +80,11 @@ for jiraRelease in jiraReleases:
 		"releaseProjectType": "NotIsProject",
 		"additionalInformation": []
 	}
-	createdRelease = plutora.api('POST',"releases",data=plutoraRelease)
-	createdReleaseId = createdRelease['id']
+	if 'releaseDate' in jiraRelease:
+		plutoraRelease["implementationDate"]=jiraRelease['releaseDate']
+	if 'description' in jiraRelease:
+		plutoraRelease["summary"] += "<div>%s</div>" % jiraRelease['description']
+
 
 	# Add a system
 	# POST releases/{id}/systems
@@ -87,7 +95,16 @@ for jiraRelease in jiraReleases:
 		"systemRoleDependencyTypeId": "15767d33-5146-410b-8755-0b451335c79b",
 		"systemRoleDependencyType": "Code Implementation Dependency"
 	}
-	plutora.api('POST',"releases/%s/systems" % createdReleaseId,data=systemToAttach)
+
+	if jiraReleaseName in existingReleases:
+		createdReleaseId = existingReleases[jiraReleaseName]
+		plutoraRelease["id"] = createdReleaseId
+		plutora.api('PUT',"releases/" + createdReleaseId,data=plutoraRelease)
+	else:
+		createdRelease = plutora.api('POST',"releases",data=plutoraRelease)
+		createdReleaseId = createdRelease['id']
+		# TODO: test for whether the system is attached and move outside of this clause
+		plutora.api("POST","releases/%s/systems" % createdReleaseId,data=systemToAttach)
 
 	# PUT changes/{id}/deliveryReleases/{releaseId}
 	releaseData = {
@@ -96,9 +113,15 @@ for jiraRelease in jiraReleases:
 	  "actualDeliveryRelease": "true"
 	}
 
+	# Get existing Plutora Releases
+	existingChanges = plutora.listToDict(plutora.api("GET","changes"), "name", "id")
 	# Attach all Changes to release
 	for jiraIssue in jiraIssues:
 		jiraName = jiraIssue['fields']['summary']
-		changeId = plutora.guidByPathAndName('changes',jiraName)
-		plutora.api('put',"changes/%s/deliveryReleases/%s" % (changeId, createdReleaseId), releaseData )
+		if jiraName in existingChanges:
+			changeId = plutora.guidByPathAndName('changes',jiraName)
+			plutora.api('put',"changes/%s/deliveryReleases/%s" % (changeId, createdReleaseId), releaseData )
+		else:
+			print jiraName + " does not exist in Plutora Changes, not attaching to release " + jiraReleaseName
+			
 
